@@ -6,6 +6,7 @@ import {
 	resolveImageSrc,
 	splitImages,
 } from "./image";
+import { makeThumbClickable } from "./lightbox";
 import { CsvImgSettings } from "./settings";
 
 export interface RenderContext {
@@ -36,7 +37,8 @@ function appendImage(
 		img.alt = rawPath;
 		img.style.maxWidth = `${ctx.thumbSize}px`;
 		img.style.maxHeight = `${ctx.thumbSize}px`;
-		img.title = rawPath;
+		img.title = `${rawPath}\n(클릭하면 크게 보기)`;
+		makeThumbClickable(img, src);
 	} else {
 		const chip = parent.createSpan({ cls: "csv-img-missing" });
 		chip.setText(`⚠ ${rawPath}`);

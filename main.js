@@ -207,6 +207,53 @@ function resolveImageSrc(app, rawPath, baseDirs, linkSourcePath) {
   return null;
 }
 
+// src/lightbox.ts
+var overlay = null;
+var imgEl = null;
+var keyHandler = null;
+function ensureOverlay() {
+  if (overlay)
+    return overlay;
+  const o = document.createElement("div");
+  o.className = "csv-img-lightbox";
+  const img = document.createElement("img");
+  img.className = "csv-img-lightbox-img";
+  o.appendChild(img);
+  o.addEventListener("click", () => closeLightbox());
+  document.body.appendChild(o);
+  overlay = o;
+  imgEl = img;
+  return o;
+}
+function openLightbox(src, alt) {
+  const o = ensureOverlay();
+  if (imgEl) {
+    imgEl.src = src;
+    imgEl.alt = alt != null ? alt : "";
+  }
+  o.addClass("is-open");
+  keyHandler = (e) => {
+    if (e.key === "Escape")
+      closeLightbox();
+  };
+  document.addEventListener("keydown", keyHandler);
+}
+function closeLightbox() {
+  if (overlay)
+    overlay.removeClass("is-open");
+  if (keyHandler) {
+    document.removeEventListener("keydown", keyHandler);
+    keyHandler = null;
+  }
+}
+function makeThumbClickable(thumb, src) {
+  thumb.addClass("csv-img-clickable");
+  thumb.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    openLightbox(src, thumb.alt);
+  });
+}
+
 // src/render.ts
 function appendImage(parent, ctx, rawPath) {
   const src = resolveImageSrc(
@@ -221,7 +268,9 @@ function appendImage(parent, ctx, rawPath) {
     img.alt = rawPath;
     img.style.maxWidth = `${ctx.thumbSize}px`;
     img.style.maxHeight = `${ctx.thumbSize}px`;
-    img.title = rawPath;
+    img.title = `${rawPath}
+(\uD074\uB9AD\uD558\uBA74 \uD06C\uAC8C \uBCF4\uAE30)`;
+    makeThumbClickable(img, src);
   } else {
     const chip = parent.createSpan({ cls: "csv-img-missing" });
     chip.setText(`\u26A0 ${rawPath}`);
@@ -569,7 +618,9 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
               im.src = src;
               im.style.maxWidth = `${s.thumbSize}px`;
               im.style.maxHeight = `${s.thumbSize}px`;
-              im.title = p;
+              im.title = `${p}
+(\uD074\uB9AD\uD558\uBA74 \uD06C\uAC8C \uBCF4\uAE30)`;
+              makeThumbClickable(im, src);
             } else {
               imgs.createSpan({
                 cls: "csv-img-missing",

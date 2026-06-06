@@ -40,6 +40,41 @@
 	border: 1px solid var(--background-modifier-border);
 }
 
+.csv-img-clickable {
+	cursor: zoom-in;
+	transition: outline 0.08s ease;
+}
+
+.csv-img-clickable:hover {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+/* full-screen lightbox */
+.csv-img-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: var(--layer-modal, 100);
+	display: none;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	background: rgba(0, 0, 0, 0.8);
+	cursor: zoom-out;
+}
+
+.csv-img-lightbox.is-open {
+	display: flex;
+}
+
+.csv-img-lightbox-img {
+	max-width: 95vw;
+	max-height: 95vh;
+	object-fit: contain;
+	border-radius: 4px;
+	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
 .csv-img-missing {
 	display: inline-block;
 	padding: 2px 8px;
@@ -217,10 +252,12 @@
 }
 
 /* column coordinate row (A, B, C ...) and row-number column share one style.
-   Text is centred both horizontally and vertically, with a 2px pad. */
-.csv-img-colhead,
-.csv-img-rowhandle,
-.csv-img-corner {
+   Text is centred both horizontally and vertically, with a 2px pad.
+   The selector is scoped under .csv-img-editable so it beats the td rule's
+   `vertical-align: top` on specificity. */
+.csv-img-editable .csv-img-colhead,
+.csv-img-editable .csv-img-rowhandle,
+.csv-img-editable .csv-img-corner {
 	background-color: var(--background-secondary);
 	color: var(--text-muted);
 	font-size: 0.85em;

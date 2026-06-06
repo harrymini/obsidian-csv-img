@@ -7,6 +7,7 @@ import {
 	resolveImageSrc,
 	splitImages,
 } from "./image";
+import { makeThumbClickable } from "./lightbox";
 import { RenderContext, renderAssetsGallery } from "./render";
 import { CsvImgSettings } from "./settings";
 
@@ -266,7 +267,8 @@ export class CsvImgView extends TextFileView {
 							im.src = src;
 							im.style.maxWidth = `${s.thumbSize}px`;
 							im.style.maxHeight = `${s.thumbSize}px`;
-							im.title = p;
+							im.title = `${p}\n(클릭하면 크게 보기)`;
+							makeThumbClickable(im, src);
 						} else {
 							imgs.createSpan({
 								cls: "csv-img-missing",
