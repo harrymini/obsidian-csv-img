@@ -245,6 +245,11 @@ export class CsvImgView extends TextFileView {
 				const isImg =
 					r > 0 && imageColIdx.has(ci) && cellHasImage(value);
 
+				// text-only cells let the input fill the whole cell (so a click
+				// anywhere in the cell focuses it and the focus border frames
+				// the full height). Image cells keep flow layout.
+				td.addClass(isImg ? "csv-img-imgcell" : "csv-img-textcell");
+
 				if (isImg) {
 					const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
 					for (const p of splitImages(value)) {
@@ -269,6 +274,14 @@ export class CsvImgView extends TextFileView {
 							});
 						}
 					}
+				}
+
+				// For text cells the input is absolutely positioned (fills the
+				// whole cell for click + height), so it contributes no width to
+				// the auto table layout. A hidden in-flow sizer carries the
+				// text width so the column sizes to content like a spreadsheet.
+				if (!isImg) {
+					td.createDiv({ cls: "csv-img-sizer", text: value || " " });
 				}
 
 				const input = td.createEl("input", {

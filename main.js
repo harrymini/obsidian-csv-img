@@ -552,6 +552,7 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
         const td = tr.createEl("td");
         const value = (_a = this.matrix[r][ci]) != null ? _a : "";
         const isImg = r > 0 && imageColIdx.has(ci) && cellHasImage(value);
+        td.addClass(isImg ? "csv-img-imgcell" : "csv-img-textcell");
         if (isImg) {
           const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
           for (const p of splitImages(value)) {
@@ -576,6 +577,9 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
               });
             }
           }
+        }
+        if (!isImg) {
+          td.createDiv({ cls: "csv-img-sizer", text: value || " " });
         }
         const input = td.createEl("input", {
           cls: "csv-img-cellinput",
