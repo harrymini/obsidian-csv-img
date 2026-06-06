@@ -216,14 +216,13 @@ export class CsvImgView extends TextFileView {
 		this.headers.forEach((h, ci) => {
 			const th = htr.createEl("th");
 			if (imageCols.has(h)) th.addClass("csv-img-col");
-			const cell = th.createDiv({
-				cls: "csv-img-headcell",
-				text: h,
+			const input = th.createEl("input", {
+				cls: "csv-img-cellinput csv-img-headinput",
+				attr: { type: "text", value: h },
 			});
-			cell.contentEditable = "true";
-			cell.addEventListener("blur", () => {
-				this.headers[ci] = cell.innerText;
-				this.matrix[0][ci] = cell.innerText;
+			input.addEventListener("change", () => {
+				this.headers[ci] = input.value;
+				this.matrix[0][ci] = input.value;
 				this.persist();
 			});
 		});
@@ -270,29 +269,41 @@ export class CsvImgView extends TextFileView {
 					}
 				}
 
-				const edit = td.createDiv({ cls: "csv-img-cell" });
-				edit.contentEditable = "true";
-				edit.setText(value);
-				this.bindCell(edit, r, ci);
+				const input = td.createEl("input", {
+					cls: "csv-img-cellinput",
+					attr: { type: "text", value },
+				});
+				this.bindCell(input, r, ci);
 			}
 		}
 	}
 
-	private bindCell(el: HTMLElement, r: number, ci: number): void {
-		el.addEventListener("blur", () => {
-			const v = el.innerText;
+	private bindCell(el: HTMLInputElement, r: number, ci: number): void {
+		const commit = () => {
+			const v = el.value;
 			if (this.matrix[r][ci] !== v) {
 				// pad short rows so the column index is valid
 				while (this.matrix[r].length <= ci) this.matrix[r].push("");
 				this.matrix[r][ci] = v;
 				this.persist();
 			}
-		});
-		// Enter commits (blur) instead of inserting a newline into the cell.
+		};
+		el.addEventListener("change", commit);
+		el.addEventListener("blur", commit);
+		// Enter commits + moves focus to the same column in the next row,
+		// like a spreadsheet.
 		el.addEventListener("keydown", (ev) => {
-			if (ev.key === "Enter" && !ev.shiftKey) {
+			if (ev.key === "Enter") {
 				ev.preventDefault();
-				el.blur();
+				commit();
+				const inputs = this.contentEl.querySelectorAll<HTMLInputElement>(
+					"tbody tr td input.csv-img-cellinput"
+				);
+				const cols = this.headers.length;
+				const flatIdx = (r - 1) * cols + ci;
+				const next = inputs[flatIdx + cols];
+				if (next) next.focus();
+				else el.blur();
 			}
 		});
 	}

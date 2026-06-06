@@ -530,14 +530,13 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
       const th = htr.createEl("th");
       if (imageCols.has(h))
         th.addClass("csv-img-col");
-      const cell = th.createDiv({
-        cls: "csv-img-headcell",
-        text: h
+      const input = th.createEl("input", {
+        cls: "csv-img-cellinput csv-img-headinput",
+        attr: { type: "text", value: h }
       });
-      cell.contentEditable = "true";
-      cell.addEventListener("blur", () => {
-        this.headers[ci] = cell.innerText;
-        this.matrix[0][ci] = cell.innerText;
+      input.addEventListener("change", () => {
+        this.headers[ci] = input.value;
+        this.matrix[0][ci] = input.value;
         this.persist();
       });
     });
@@ -580,27 +579,40 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
             }
           }
         }
-        const edit = td.createDiv({ cls: "csv-img-cell" });
-        edit.contentEditable = "true";
-        edit.setText(value);
-        this.bindCell(edit, r, ci);
+        const input = td.createEl("input", {
+          cls: "csv-img-cellinput",
+          attr: { type: "text", value }
+        });
+        this.bindCell(input, r, ci);
       }
     }
   }
   bindCell(el, r, ci) {
-    el.addEventListener("blur", () => {
-      const v = el.innerText;
+    const commit = () => {
+      const v = el.value;
       if (this.matrix[r][ci] !== v) {
         while (this.matrix[r].length <= ci)
           this.matrix[r].push("");
         this.matrix[r][ci] = v;
         this.persist();
       }
-    });
+    };
+    el.addEventListener("change", commit);
+    el.addEventListener("blur", commit);
     el.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" && !ev.shiftKey) {
+      if (ev.key === "Enter") {
         ev.preventDefault();
-        el.blur();
+        commit();
+        const inputs = this.contentEl.querySelectorAll(
+          "tbody tr td input.csv-img-cellinput"
+        );
+        const cols = this.headers.length;
+        const flatIdx = (r - 1) * cols + ci;
+        const next = inputs[flatIdx + cols];
+        if (next)
+          next.focus();
+        else
+          el.blur();
       }
     });
   }

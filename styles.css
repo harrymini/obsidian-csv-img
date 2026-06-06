@@ -142,29 +142,40 @@
 	overflow: auto;
 }
 
-/* editable table */
+/* editable table — csv-lite-style: each cell is a full-bleed <input>,
+   the focus ring frames the whole cell. */
 .csv-img-editable td,
 .csv-img-editable th {
 	position: relative;
+	padding: 0;
 }
 
-.csv-img-cell,
-.csv-img-headcell {
+.csv-img-cellinput {
+	width: 100%;
 	min-width: 60px;
-	min-height: 1.2em;
+	box-sizing: border-box;
+	padding: 4px 8px;
+	margin: 0;
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-normal);
+	font-family: inherit;
+	font-size: inherit;
+	line-height: 1.4;
 	outline: none;
-	white-space: pre-wrap;
-	word-break: break-word;
 }
 
-.csv-img-cell:focus,
-.csv-img-headcell:focus {
+/* focus frames the whole cell (inset ring, no layout shift) */
+.csv-img-cellinput:focus {
 	box-shadow: inset 0 0 0 2px var(--interactive-accent);
+	background: var(--background-primary);
 	border-radius: 3px;
 }
 
-.csv-img-headcell {
+.csv-img-headinput {
 	font-weight: 600;
+	background: var(--background-secondary);
 }
 
 .csv-img-rowhandle {
@@ -183,7 +194,8 @@
 }
 
 .csv-img-editable .csv-img-cellimgs {
-	margin-bottom: 4px;
+	margin: 0;
+	padding: 6px 8px 2px;
 }
 
 .csv-img-hidden {
