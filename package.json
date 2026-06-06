@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-csv-img",
-	"version": "0.1.0",
-	"description": "Render CSV as a table in Obsidian and embed image cells as inline images, with an assets.csv preset.",
+	"version": "0.2.0",
+	"description": "Edit .csv files in Obsidian as an image-aware spreadsheet, plus a csv-img code block and assets preset.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

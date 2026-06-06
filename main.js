@@ -27,9 +27,19 @@ __export(main_exports, {
   default: () => CsvImgPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/csv.ts
+function stringifyCsv(matrix) {
+  return matrix.map((row) => row.map(escapeField).join(",")).join("\n");
+}
+function escapeField(value) {
+  const v = value != null ? value : "";
+  if (/[",\r\n]/.test(v)) {
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+  return v;
+}
 function parseCsv(input) {
   const text = stripBom(input);
   const matrix = parseToMatrix(text);
@@ -357,14 +367,298 @@ function stripQuotes(s) {
   return s;
 }
 
+// src/view.ts
+var import_obsidian2 = require("obsidian");
+var CSV_VIEW_TYPE = "csv-img-view";
+var CsvImgView = class extends import_obsidian2.TextFileView {
+  constructor(leaf, getSettings) {
+    super(leaf);
+    this.mode = "table";
+    this.matrix = [];
+    this.headers = [];
+    this.textarea = null;
+    this.modeActions = [];
+    this.getSettings = getSettings;
+  }
+  getViewType() {
+    return CSV_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return this.file ? this.file.basename : "CSV";
+  }
+  getIcon() {
+    return "table";
+  }
+  /** TextFileView contract: the file's current text. */
+  getViewData() {
+    if (this.mode === "source" && this.textarea) {
+      return this.textarea.value;
+    }
+    return stringifyCsv(this.matrix);
+  }
+  /** TextFileView contract: load (or reload) file content. */
+  setViewData(data, clear) {
+    this.data = data;
+    const parsed = parseCsv(data);
+    this.headers = parsed.headers;
+    this.matrix = parsed.matrix.length ? parsed.matrix.map((r) => r.slice()) : [[]];
+    if (clear && this.mode === "gallery" && !this.isAssets()) {
+      this.mode = "table";
+    }
+    this.render();
+  }
+  clear() {
+    this.data = "";
+    this.matrix = [];
+    this.headers = [];
+    this.textarea = null;
+    this.contentEl.empty();
+  }
+  async onOpen() {
+    this.modeActions.push(
+      this.addAction("table", "\uD45C \uD3B8\uC9D1", () => this.switchMode("table"))
+    );
+    this.modeActions.push(
+      this.addAction(
+        "images",
+        "assets \uAC24\uB7EC\uB9AC",
+        () => this.switchMode("gallery")
+      )
+    );
+    this.modeActions.push(
+      this.addAction("code", "\uC6D0\uBCF8 CSV", () => this.switchMode("source"))
+    );
+    this.addAction("plus", "\uD589 \uCD94\uAC00", () => this.addRow());
+  }
+  switchMode(mode) {
+    if (this.mode === mode)
+      return;
+    this.commitPendingSource();
+    this.mode = mode;
+    this.render();
+  }
+  /** If leaving source mode, re-parse the textarea into the matrix. */
+  commitPendingSource() {
+    if (this.mode === "source" && this.textarea) {
+      const parsed = parseCsv(this.textarea.value);
+      this.headers = parsed.headers;
+      this.matrix = parsed.matrix.length ? parsed.matrix : [[]];
+      this.data = this.textarea.value;
+    }
+  }
+  /** Persist the current matrix and trigger TextFileView's save. */
+  persist() {
+    this.data = stringifyCsv(this.matrix);
+    this.requestSave();
+  }
+  isAssets() {
+    const s = this.getSettings();
+    const has = (c) => this.headers.includes(c);
+    return has(s.assetsFileColumn) && (has(s.assetsCaptionColumn) || has(s.assetsLinkTableColumn) || has(s.assetsLicenseColumn));
+  }
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.addClass("csv-img-fileview");
+    const galleryAction = this.modeActions[1];
+    if (galleryAction) {
+      galleryAction.toggleClass("csv-img-hidden", !this.isAssets());
+    }
+    if (this.mode === "source")
+      return this.renderSource(c);
+    if (this.mode === "gallery")
+      return this.renderGallery(c);
+    return this.renderTable(c);
+  }
+  // ---- SOURCE ----------------------------------------------------------
+  renderSource(container) {
+    const ta = container.createEl("textarea", { cls: "csv-img-source" });
+    ta.value = stringifyCsv(this.matrix);
+    ta.spellcheck = false;
+    ta.addEventListener("input", () => {
+      this.data = ta.value;
+      this.requestSave();
+    });
+    this.textarea = ta;
+  }
+  // ---- GALLERY ---------------------------------------------------------
+  renderGallery(container) {
+    this.textarea = null;
+    const wrap = container.createDiv({ cls: "csv-img-fileview-inner" });
+    const csv = parseCsv(stringifyCsv(this.matrix));
+    const s = this.getSettings();
+    const ctx = {
+      app: this.app,
+      baseDirs: [this.file ? dirOf(this.file.path) : ""],
+      linkSourcePath: this.file ? this.file.path : "",
+      settings: s,
+      thumbSize: s.thumbSize
+    };
+    renderAssetsGallery(wrap, csv, ctx);
+  }
+  // ---- TABLE (editable) ------------------------------------------------
+  renderTable(container) {
+    var _a;
+    this.textarea = null;
+    if (this.headers.length === 0) {
+      container.createDiv({ cls: "csv-img-fileview-inner" }).createDiv({ cls: "csv-img-error", text: "csv-img: \uBE48 CSV." });
+      return;
+    }
+    const s = this.getSettings();
+    const rowObjs = this.matrix.slice(1).map((cells) => {
+      const o = {};
+      this.headers.forEach((h, i) => {
+        var _a2;
+        return o[h] = (_a2 = cells[i]) != null ? _a2 : "";
+      });
+      return o;
+    });
+    const imageCols = detectImageColumns(
+      this.headers,
+      rowObjs,
+      s.forcedImageColumns.length ? s.forcedImageColumns : void 0
+    );
+    const baseDirs = [this.file ? dirOf(this.file.path) : ""];
+    const scroll = container.createDiv({ cls: "csv-img-fileview-inner" });
+    const table = scroll.createEl("table", {
+      cls: "csv-img-table csv-img-editable"
+    });
+    const thead = table.createEl("thead");
+    const htr = thead.createEl("tr");
+    htr.createEl("th", { cls: "csv-img-rowhandle" });
+    this.headers.forEach((h, ci) => {
+      const th = htr.createEl("th");
+      if (imageCols.has(h))
+        th.addClass("csv-img-col");
+      const cell = th.createDiv({
+        cls: "csv-img-headcell",
+        text: h
+      });
+      cell.contentEditable = "true";
+      cell.addEventListener("blur", () => {
+        this.headers[ci] = cell.innerText;
+        this.matrix[0][ci] = cell.innerText;
+        this.persist();
+      });
+    });
+    const tbody = table.createEl("tbody");
+    for (let r = 1; r < this.matrix.length; r++) {
+      const tr = tbody.createEl("tr");
+      const handle = tr.createEl("td", { cls: "csv-img-rowhandle" });
+      handle.setText(String(r));
+      handle.addEventListener(
+        "click",
+        (ev) => this.rowMenu(ev, r)
+      );
+      for (let ci = 0; ci < this.headers.length; ci++) {
+        const td = tr.createEl("td");
+        const value = (_a = this.matrix[r][ci]) != null ? _a : "";
+        const header = this.headers[ci];
+        const isImg = imageCols.has(header) && cellHasImage(value);
+        if (isImg) {
+          const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
+          for (const p of splitImages(value)) {
+            const src = resolveImageSrc(
+              this.app,
+              p,
+              baseDirs,
+              this.file ? this.file.path : ""
+            );
+            if (src) {
+              const im = imgs.createEl("img", {
+                cls: "csv-img-thumb"
+              });
+              im.src = src;
+              im.style.maxWidth = `${s.thumbSize}px`;
+              im.style.maxHeight = `${s.thumbSize}px`;
+              im.title = p;
+            } else {
+              imgs.createSpan({
+                cls: "csv-img-missing",
+                text: `\u26A0 ${p}`
+              });
+            }
+          }
+        }
+        const edit = td.createDiv({ cls: "csv-img-cell" });
+        edit.contentEditable = "true";
+        edit.setText(value);
+        this.bindCell(edit, r, ci);
+      }
+    }
+  }
+  bindCell(el, r, ci) {
+    el.addEventListener("blur", () => {
+      const v = el.innerText;
+      if (this.matrix[r][ci] !== v) {
+        while (this.matrix[r].length <= ci)
+          this.matrix[r].push("");
+        this.matrix[r][ci] = v;
+        this.persist();
+      }
+    });
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        el.blur();
+      }
+    });
+  }
+  rowMenu(ev, r) {
+    const menu = new import_obsidian2.Menu();
+    menu.addItem(
+      (i) => i.setTitle("\uC704\uC5D0 \uD589 \uCD94\uAC00").setIcon("arrow-up").onClick(() => this.insertRow(r))
+    );
+    menu.addItem(
+      (i) => i.setTitle("\uC544\uB798\uC5D0 \uD589 \uCD94\uAC00").setIcon("arrow-down").onClick(() => this.insertRow(r + 1))
+    );
+    menu.addItem(
+      (i) => i.setTitle("\uD589 \uC0AD\uC81C").setIcon("trash").onClick(() => this.deleteRow(r))
+    );
+    menu.showAtMouseEvent(ev);
+  }
+  addRow() {
+    if (this.mode === "source")
+      return;
+    this.insertRow(this.matrix.length);
+  }
+  insertRow(at) {
+    const width = this.headers.length || 1;
+    const blank = new Array(width).fill("");
+    const idx = Math.max(1, Math.min(at, this.matrix.length));
+    this.matrix.splice(idx, 0, blank);
+    this.persist();
+    this.render();
+  }
+  deleteRow(r) {
+    if (r <= 0 || r >= this.matrix.length)
+      return;
+    this.matrix.splice(r, 1);
+    this.persist();
+    this.render();
+  }
+};
+
 // src/main.ts
-var CsvImgPlugin = class extends import_obsidian2.Plugin {
+var CsvImgPlugin = class extends import_obsidian3.Plugin {
   async onload() {
     await this.loadSettings();
     this.registerMarkdownCodeBlockProcessor(
       "csv-img",
       (source, el, ctx) => this.processBlock(source, el, ctx)
     );
+    this.registerView(
+      CSV_VIEW_TYPE,
+      (leaf) => new CsvImgView(leaf, () => this.settings)
+    );
+    try {
+      this.registerExtensions(["csv"], CSV_VIEW_TYPE);
+    } catch (e) {
+      console.warn(
+        "obsidian-csv-img: could not register .csv extension (another CSV plugin may own it).",
+        e
+      );
+    }
     this.addSettingTab(new CsvImgSettingTab(this.app, this));
   }
   async processBlock(source, el, ctx) {
@@ -440,18 +734,18 @@ var CsvImgPlugin = class extends import_obsidian2.Plugin {
     const noteDir = notePath.includes("/") ? notePath.slice(0, notePath.lastIndexOf("/")) : "";
     const candidates = [];
     if (noteDir)
-      candidates.push((0, import_obsidian2.normalizePath)(`${noteDir}/${path}`));
-    candidates.push((0, import_obsidian2.normalizePath)(path));
+      candidates.push((0, import_obsidian3.normalizePath)(`${noteDir}/${path}`));
+    candidates.push((0, import_obsidian3.normalizePath)(path));
     for (const c of candidates) {
       const f = this.app.vault.getAbstractFileByPath(c);
-      if (f instanceof import_obsidian2.TFile)
+      if (f instanceof import_obsidian3.TFile)
         return f;
     }
     const linked = this.app.metadataCache.getFirstLinkpathDest(
       path,
       notePath
     );
-    return linked instanceof import_obsidian2.TFile ? linked : null;
+    return linked instanceof import_obsidian3.TFile ? linked : null;
   }
   renderError(el, msg) {
     const div = el.createDiv({ cls: "csv-img-error" });
@@ -468,7 +762,7 @@ var CsvImgPlugin = class extends import_obsidian2.Plugin {
     await this.saveData(this.settings);
   }
 };
-var CsvImgSettingTab = class extends import_obsidian2.PluginSettingTab {
+var CsvImgSettingTab = class extends import_obsidian3.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -476,7 +770,7 @@ var CsvImgSettingTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian2.Setting(containerEl).setName("\uC378\uB124\uC77C \uD06C\uAE30 (px)").setDesc("\uC774\uBBF8\uC9C0 \uC140/\uCE74\uB4DC \uC378\uB124\uC77C\uC758 \uCD5C\uB300 \uD3ED\xB7\uB192\uC774. \uBE14\uB85D\uC5D0\uC11C `size:` \uB85C \uB36E\uC5B4\uC4F8 \uC218 \uC788\uC74C.").addText(
+    new import_obsidian3.Setting(containerEl).setName("\uC378\uB124\uC77C \uD06C\uAE30 (px)").setDesc("\uC774\uBBF8\uC9C0 \uC140/\uCE74\uB4DC \uC378\uB124\uC77C\uC758 \uCD5C\uB300 \uD3ED\xB7\uB192\uC774. \uBE14\uB85D\uC5D0\uC11C `size:` \uB85C \uB36E\uC5B4\uC4F8 \uC218 \uC788\uC74C.").addText(
       (t) => t.setValue(String(this.plugin.settings.thumbSize)).onChange(async (v) => {
         const n = parseInt(v, 10);
         if (!isNaN(n) && n > 0) {
@@ -485,7 +779,7 @@ var CsvImgSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\uAC15\uC81C \uC774\uBBF8\uC9C0 \uCEEC\uB7FC (\uBC94\uC6A9 \uBAA8\uB4DC)").setDesc(
+    new import_obsidian3.Setting(containerEl).setName("\uAC15\uC81C \uC774\uBBF8\uC9C0 \uCEEC\uB7FC (\uBC94\uC6A9 \uBAA8\uB4DC)").setDesc(
       "\uCF64\uB9C8\uB85C \uAD6C\uBD84. \uC790\uB3D9 \uAC10\uC9C0 \uB300\uC2E0 \uC774 \uCEEC\uB7FC\uB4E4\uC744 \uD56D\uC0C1 \uC774\uBBF8\uC9C0\uB85C \uB80C\uB354. \uBE14\uB85D\uC758 `images:` \uAC00 \uC6B0\uC120."
     ).addText(
       (t) => t.setValue(this.plugin.settings.forcedImageColumns.join(", ")).setPlaceholder("\uC608: file, thumbnail").onChange(async (v) => {
@@ -498,7 +792,7 @@ var CsvImgSettingTab = class extends import_obsidian2.PluginSettingTab {
       text: "preset: assets \uAC24\uB7EC\uB9AC\uC5D0\uC11C \uAC01 \uC815\uBCF4\uB97C \uC5B4\uB290 \uCEEC\uB7FC\uC5D0\uC11C \uC77D\uC744\uC9C0 (ai-love-island assets.csv \uAE30\uBCF8\uAC12).",
       cls: "setting-item-description"
     });
-    const colSetting = (name, desc, get, set) => new import_obsidian2.Setting(containerEl).setName(name).setDesc(desc).addText(
+    const colSetting = (name, desc, get, set) => new import_obsidian3.Setting(containerEl).setName(name).setDesc(desc).addText(
       (t) => t.setValue(get()).onChange(async (v) => {
         set(v.trim());
         await this.plugin.saveSettings();

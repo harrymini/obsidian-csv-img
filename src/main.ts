@@ -16,6 +16,7 @@ import {
 	DEFAULT_SETTINGS,
 	parseBlockOptions,
 } from "./settings";
+import { CSV_VIEW_TYPE, CsvImgView } from "./view";
 
 export default class CsvImgPlugin extends Plugin {
 	settings: CsvImgSettings;
@@ -27,6 +28,25 @@ export default class CsvImgPlugin extends Plugin {
 			"csv-img",
 			(source, el, ctx) => this.processBlock(source, el, ctx)
 		);
+
+		// Open .csv files in our image-aware view. registerExtensions makes
+		// Obsidian show .csv in the file explorer AND route clicks here.
+		// (Only one plugin may claim the "csv" extension — disable other CSV
+		// file-view plugins to avoid a conflict.)
+		this.registerView(
+			CSV_VIEW_TYPE,
+			(leaf) => new CsvImgView(leaf, () => this.settings)
+		);
+		try {
+			this.registerExtensions(["csv"], CSV_VIEW_TYPE);
+		} catch (e) {
+			// Another plugin already claimed .csv — surface a one-time notice
+			// rather than failing the whole plugin load.
+			console.warn(
+				"obsidian-csv-img: could not register .csv extension (another CSV plugin may own it).",
+				e
+			);
+		}
 
 		this.addSettingTab(new CsvImgSettingTab(this.app, this));
 	}

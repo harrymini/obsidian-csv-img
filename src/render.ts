@@ -8,7 +8,7 @@ import {
 } from "./image";
 import { CsvImgSettings } from "./settings";
 
-interface RenderContext {
+export interface RenderContext {
 	app: App;
 	/** Folders (vault-relative) to try when resolving relative image paths. */
 	baseDirs: string[];

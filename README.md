@@ -1,14 +1,35 @@
 # Obsidian CSV Image Table
 
-Render a CSV as a table inside Obsidian — and **embed image cells as inline
-images** instead of showing raw paths. Includes an `assets` preset tuned for the
+Open and **edit `.csv` files** in Obsidian — as a spreadsheet that **embeds
+image-path cells as inline thumbnails** instead of showing raw paths. Also
+renders CSV inside notes via a `csv-img` code block. Includes an `assets`
+preset tuned for the
 [ai-love-island](https://github.com/harrymini/ai-love-island) `assets.csv`
 schema (multi-image cells, caption/source/license, linked rows).
 
 Existing CSV viewers render every cell as text. This one detects image columns
-and draws thumbnails, so an image-index CSV becomes a real gallery.
+and draws thumbnails, so an image-index CSV becomes a real gallery — while
+still being editable.
 
-## Usage
+## `.csv` file editor
+
+Click any `.csv` file in the file explorer to open it here. Three toolbar
+modes (top-right):
+
+| icon | mode | what |
+|---|---|---|
+| ▦ table | **Table** (default) | editable grid — click a cell to edit, Enter to commit. Image-path cells show a thumbnail above the editable path. Click a row number for insert/delete. |
+| ▣ images | **Gallery** | read-only assets card view (shown only when the header matches the assets schema) |
+| ‹› code | **Source** | raw `<textarea>` for bulk edits |
+
+Edits are saved back to the file (round-trip verified against the
+ai-love-island CSVs, including quoted fields and `;`-multi-image cells).
+
+> **One CSV plugin at a time.** Obsidian lets only one plugin own the `.csv`
+> extension. Disable other CSV file-view plugins (e.g. *CSV Lite*, *CSV Editor*)
+> or this view won't open on click. Code-block rendering below is unaffected.
+
+## Code block usage
 
 Put a `csv-img` code block in any note. In **reading/preview mode** it renders.
 

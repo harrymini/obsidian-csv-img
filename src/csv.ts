@@ -19,6 +19,26 @@ export interface ParsedCsv {
 	matrix: string[][];
 }
 
+/**
+ * Serialize a matrix (header row + data rows) back to CSV text.
+ *
+ * Inverse of parseToMatrix: a field is quoted iff it contains a comma, quote,
+ * CR, or LF; inner quotes are doubled. Rows are joined with '\n'. This keeps a
+ * round trip (parse -> edit a cell -> stringify) faithful, including the
+ * ';'-multi-image convention (a ';' alone never forces quoting).
+ */
+export function stringifyCsv(matrix: string[][]): string {
+	return matrix.map((row) => row.map(escapeField).join(",")).join("\n");
+}
+
+function escapeField(value: string): string {
+	const v = value ?? "";
+	if (/[",\r\n]/.test(v)) {
+		return '"' + v.replace(/"/g, '""') + '"';
+	}
+	return v;
+}
+
 export function parseCsv(input: string): ParsedCsv {
 	const text = stripBom(input);
 	const matrix = parseToMatrix(text);
