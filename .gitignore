@@ -1,0 +1,7 @@
+node_modules/
+*.js.map
+
+# Build output is committed for direct-install convenience (Obsidian needs main.js),
+# but ignore the tsc cache and editor cruft.
+.DS_Store
+*.tsbuildinfo
