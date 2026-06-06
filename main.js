@@ -518,42 +518,40 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
       rowObjs,
       s.forcedImageColumns.length ? s.forcedImageColumns : void 0
     );
+    const imageColIdx = /* @__PURE__ */ new Set();
+    this.headers.forEach((h, i) => {
+      if (imageCols.has(h))
+        imageColIdx.add(i);
+    });
     const baseDirs = [this.file ? dirOf(this.file.path) : ""];
+    const cols = this.headers.length;
     const scroll = container.createDiv({ cls: "csv-img-fileview-inner" });
     const table = scroll.createEl("table", {
       cls: "csv-img-table csv-img-editable"
     });
     const thead = table.createEl("thead");
     const htr = thead.createEl("tr");
-    htr.createEl("th", { cls: "csv-img-rowhandle" });
-    this.headers.forEach((h, ci) => {
-      const th = htr.createEl("th");
-      if (imageCols.has(h))
+    htr.createEl("th", { cls: "csv-img-corner" });
+    for (let ci = 0; ci < cols; ci++) {
+      const th = htr.createEl("th", {
+        cls: "csv-img-colhead",
+        text: colLabel(ci)
+      });
+      if (imageColIdx.has(ci))
         th.addClass("csv-img-col");
-      const input = th.createEl("input", {
-        cls: "csv-img-cellinput csv-img-headinput",
-        attr: { type: "text", value: h }
-      });
-      input.addEventListener("change", () => {
-        this.headers[ci] = input.value;
-        this.matrix[0][ci] = input.value;
-        this.persist();
-      });
-    });
+    }
     const tbody = table.createEl("tbody");
-    for (let r = 1; r < this.matrix.length; r++) {
+    for (let r = 0; r < this.matrix.length; r++) {
       const tr = tbody.createEl("tr");
+      if (r === 0)
+        tr.addClass("csv-img-headerrow");
       const handle = tr.createEl("td", { cls: "csv-img-rowhandle" });
       handle.setText(String(r));
-      handle.addEventListener(
-        "click",
-        (ev) => this.rowMenu(ev, r)
-      );
-      for (let ci = 0; ci < this.headers.length; ci++) {
+      handle.addEventListener("click", (ev) => this.rowMenu(ev, r));
+      for (let ci = 0; ci < cols; ci++) {
         const td = tr.createEl("td");
         const value = (_a = this.matrix[r][ci]) != null ? _a : "";
-        const header = this.headers[ci];
-        const isImg = imageCols.has(header) && cellHasImage(value);
+        const isImg = r > 0 && imageColIdx.has(ci) && cellHasImage(value);
         if (isImg) {
           const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
           for (const p of splitImages(value)) {
@@ -594,6 +592,8 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
         while (this.matrix[r].length <= ci)
           this.matrix[r].push("");
         this.matrix[r][ci] = v;
+        if (r === 0)
+          this.headers[ci] = v;
         this.persist();
       }
     };
@@ -607,7 +607,7 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
           "tbody tr td input.csv-img-cellinput"
         );
         const cols = this.headers.length;
-        const flatIdx = (r - 1) * cols + ci;
+        const flatIdx = r * cols + ci;
         const next = inputs[flatIdx + cols];
         if (next)
           next.focus();
@@ -650,6 +650,15 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
     this.render();
   }
 };
+function colLabel(index) {
+  let n = index;
+  let label = "";
+  do {
+    label = String.fromCharCode(65 + n % 26) + label;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return label;
+}
 
 // src/main.ts
 var CsvImgPlugin = class extends import_obsidian3.Plugin {

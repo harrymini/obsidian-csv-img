@@ -143,39 +143,63 @@
 }
 
 /* editable table — csv-lite-style: each cell is a full-bleed <input>,
-   the focus ring frames the whole cell. */
+   the focus highlight frames the whole cell. */
+.csv-img-editable {
+	table-layout: auto;
+}
+
 .csv-img-editable td,
 .csv-img-editable th {
 	position: relative;
 	padding: 0;
 }
 
+/* the <input> fills the entire cell, with no chrome of its own */
 .csv-img-cellinput {
+	display: block;
 	width: 100%;
-	min-width: 60px;
+	min-width: 0; /* override the browser's intrinsic input width so td controls size */
 	box-sizing: border-box;
-	padding: 4px 8px;
+	padding: 6px 8px;
 	margin: 0;
-	border: none;
+	border: none !important;
 	border-radius: 0;
-	background: transparent;
+	background: transparent !important; /* no default input background */
+	box-shadow: none;
 	color: var(--text-normal);
 	font-family: inherit;
 	font-size: inherit;
-	line-height: 1.4;
+	line-height: 1.5;
 	outline: none;
 }
 
-/* focus frames the whole cell (inset ring, no layout shift) */
-.csv-img-cellinput:focus {
-	box-shadow: inset 0 0 0 2px var(--interactive-accent);
-	background: var(--background-primary);
-	border-radius: 3px;
+/* focus highlights the whole cell with the highlight colour */
+.csv-img-cellinput:focus,
+.csv-img-cellinput:focus-visible {
+	background: var(--text-highlight-bg) !important;
+	box-shadow: inset 0 0 0 2px var(--text-accent);
+	outline: none;
 }
 
-.csv-img-headinput {
+/* row 0 = the CSV header, shown bold like a header but still editable */
+.csv-img-headerrow .csv-img-cellinput {
 	font-weight: 600;
+}
+
+/* column coordinate row (A, B, C ...) */
+.csv-img-colhead {
 	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-weight: 600;
+	text-align: center;
+	padding: 3px 6px;
+	font-size: 0.82em;
+	user-select: none;
+}
+
+.csv-img-corner {
+	background: var(--background-secondary);
+	width: 2.4em;
 }
 
 .csv-img-rowhandle {

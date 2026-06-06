@@ -192,6 +192,9 @@ export class CsvImgView extends TextFileView {
 		}
 
 		const s = this.getSettings();
+		// matrix[0] is the CSV header (id, file, ...) — used to detect image
+		// columns. Visually it is just data row 0 (csv-lite style); column
+		// headers are spreadsheet coordinates A, B, C, ...
 		const rowObjs = this.matrix.slice(1).map((cells) => {
 			const o: Record<string, string> = {};
 			this.headers.forEach((h, i) => (o[h] = cells[i] ?? ""));
@@ -202,46 +205,45 @@ export class CsvImgView extends TextFileView {
 			rowObjs,
 			s.forcedImageColumns.length ? s.forcedImageColumns : undefined
 		);
+		const imageColIdx = new Set<number>();
+		this.headers.forEach((h, i) => {
+			if (imageCols.has(h)) imageColIdx.add(i);
+		});
 		const baseDirs = [this.file ? dirOf(this.file.path) : ""];
+		const cols = this.headers.length;
 
 		const scroll = container.createDiv({ cls: "csv-img-fileview-inner" });
 		const table = scroll.createEl("table", {
 			cls: "csv-img-table csv-img-editable",
 		});
 
-		// header row (editable header text + per-column delete)
+		// column coordinate row: (corner) A B C ...
 		const thead = table.createEl("thead");
 		const htr = thead.createEl("tr");
-		htr.createEl("th", { cls: "csv-img-rowhandle" }); // corner
-		this.headers.forEach((h, ci) => {
-			const th = htr.createEl("th");
-			if (imageCols.has(h)) th.addClass("csv-img-col");
-			const input = th.createEl("input", {
-				cls: "csv-img-cellinput csv-img-headinput",
-				attr: { type: "text", value: h },
+		htr.createEl("th", { cls: "csv-img-corner" }); // corner
+		for (let ci = 0; ci < cols; ci++) {
+			const th = htr.createEl("th", {
+				cls: "csv-img-colhead",
+				text: colLabel(ci),
 			});
-			input.addEventListener("change", () => {
-				this.headers[ci] = input.value;
-				this.matrix[0][ci] = input.value;
-				this.persist();
-			});
-		});
+			if (imageColIdx.has(ci)) th.addClass("csv-img-col");
+		}
 
-		// body
+		// body: every matrix row (including row 0 = CSV header) as edit cells
 		const tbody = table.createEl("tbody");
-		for (let r = 1; r < this.matrix.length; r++) {
+		for (let r = 0; r < this.matrix.length; r++) {
 			const tr = tbody.createEl("tr");
+			if (r === 0) tr.addClass("csv-img-headerrow");
 			const handle = tr.createEl("td", { cls: "csv-img-rowhandle" });
 			handle.setText(String(r));
-			handle.addEventListener("click", (ev) =>
-				this.rowMenu(ev, r)
-			);
+			handle.addEventListener("click", (ev) => this.rowMenu(ev, r));
 
-			for (let ci = 0; ci < this.headers.length; ci++) {
+			for (let ci = 0; ci < cols; ci++) {
 				const td = tr.createEl("td");
 				const value = this.matrix[r][ci] ?? "";
-				const header = this.headers[ci];
-				const isImg = imageCols.has(header) && cellHasImage(value);
+				// only data rows (not the header row) render image thumbnails
+				const isImg =
+					r > 0 && imageColIdx.has(ci) && cellHasImage(value);
 
 				if (isImg) {
 					const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
@@ -285,6 +287,8 @@ export class CsvImgView extends TextFileView {
 				// pad short rows so the column index is valid
 				while (this.matrix[r].length <= ci) this.matrix[r].push("");
 				this.matrix[r][ci] = v;
+				// row 0 is the CSV header — keep headers[] in sync.
+				if (r === 0) this.headers[ci] = v;
 				this.persist();
 			}
 		};
@@ -300,7 +304,7 @@ export class CsvImgView extends TextFileView {
 					"tbody tr td input.csv-img-cellinput"
 				);
 				const cols = this.headers.length;
-				const flatIdx = (r - 1) * cols + ci;
+				const flatIdx = r * cols + ci; // rows now start at 0
 				const next = inputs[flatIdx + cols];
 				if (next) next.focus();
 				else el.blur();
@@ -351,4 +355,15 @@ export class CsvImgView extends TextFileView {
 		this.persist();
 		this.render();
 	}
+}
+
+/** Spreadsheet column label: 0 -> A, 25 -> Z, 26 -> AA, ... */
+function colLabel(index: number): string {
+	let n = index;
+	let label = "";
+	do {
+		label = String.fromCharCode(65 + (n % 26)) + label;
+		n = Math.floor(n / 26) - 1;
+	} while (n >= 0);
+	return label;
 }
