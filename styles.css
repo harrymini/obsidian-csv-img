@@ -268,12 +268,17 @@
 	user-select: none;
 }
 
-.csv-img-rowhandle {
+.csv-img-rowhandle,
+.csv-img-colhead {
 	cursor: pointer;
+}
+
+.csv-img-rowhandle {
 	width: 2.6em;
 }
 
-.csv-img-rowhandle:hover {
+.csv-img-rowhandle:hover,
+.csv-img-colhead:hover {
 	color: var(--text-normal);
 	background-color: var(--background-modifier-hover);
 }

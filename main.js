@@ -588,6 +588,7 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
       });
       if (imageColIdx.has(ci))
         th.addClass("csv-img-col");
+      th.addEventListener("click", (ev) => this.colMenu(ev, ci));
     }
     const tbody = table.createEl("tbody");
     for (let r = 0; r < this.matrix.length; r++) {
@@ -670,6 +671,82 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
           el.blur();
       }
     });
+    el.addEventListener("paste", (ev) => {
+      var _a, _b;
+      const text = (_b = (_a = ev.clipboardData) == null ? void 0 : _a.getData("text/plain")) != null ? _b : "";
+      if (!/[\t\n\r]/.test(text))
+        return;
+      ev.preventDefault();
+      this.pasteBlock(text, r, ci);
+    });
+  }
+  /**
+   * Paste a TSV/CSV block with `startR`/`startC` as its top-left cell.
+   * Tabs separate columns, newlines separate rows. Grows the matrix when the
+   * block extends past the current bounds.
+   */
+  pasteBlock(text, startR, startC) {
+    const rows = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n$/, "").split("\n").map((line) => line.split("	"));
+    const cols = this.headers.length;
+    for (let dr = 0; dr < rows.length; dr++) {
+      const targetR = startR + dr;
+      while (this.matrix.length <= targetR) {
+        this.matrix.push(new Array(cols).fill(""));
+      }
+      for (let dc = 0; dc < rows[dr].length; dc++) {
+        const targetC = startC + dc;
+        while (this.headers.length <= targetC) {
+          this.headers.push("");
+          for (const row of this.matrix)
+            row.push("");
+        }
+        while (this.matrix[targetR].length <= targetC) {
+          this.matrix[targetR].push("");
+        }
+        this.matrix[targetR][targetC] = rows[dr][dc];
+        if (targetR === 0)
+          this.headers[targetC] = rows[dr][dc];
+      }
+    }
+    this.persist();
+    this.render();
+  }
+  colMenu(ev, ci) {
+    const menu = new import_obsidian2.Menu();
+    menu.addItem(
+      (i) => i.setTitle("\uC67C\uCABD\uC5D0 \uC5F4 \uCD94\uAC00").setIcon("arrow-left").onClick(() => this.insertCol(ci))
+    );
+    menu.addItem(
+      (i) => i.setTitle("\uC624\uB978\uCABD\uC5D0 \uC5F4 \uCD94\uAC00").setIcon("arrow-right").onClick(() => this.insertCol(ci + 1))
+    );
+    menu.addItem(
+      (i) => i.setTitle("\uC5F4 \uC0AD\uC81C").setIcon("trash").onClick(() => this.deleteCol(ci))
+    );
+    menu.showAtMouseEvent(ev);
+  }
+  insertCol(at) {
+    const idx = Math.max(0, Math.min(at, this.headers.length));
+    this.headers.splice(idx, 0, "");
+    for (const row of this.matrix) {
+      while (row.length < this.headers.length - 1)
+        row.push("");
+      row.splice(idx, 0, "");
+    }
+    this.persist();
+    this.render();
+  }
+  deleteCol(ci) {
+    if (ci < 0 || ci >= this.headers.length)
+      return;
+    if (this.headers.length <= 1)
+      return;
+    this.headers.splice(ci, 1);
+    for (const row of this.matrix) {
+      if (ci < row.length)
+        row.splice(ci, 1);
+    }
+    this.persist();
+    this.render();
   }
   rowMenu(ev, r) {
     const menu = new import_obsidian2.Menu();

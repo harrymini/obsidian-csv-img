@@ -228,6 +228,7 @@ export class CsvImgView extends TextFileView {
 				text: colLabel(ci),
 			});
 			if (imageColIdx.has(ci)) th.addClass("csv-img-col");
+			th.addEventListener("click", (ev) => this.colMenu(ev, ci));
 		}
 
 		// body: every matrix row (including row 0 = CSV header) as edit cells
@@ -325,6 +326,99 @@ export class CsvImgView extends TextFileView {
 				else el.blur();
 			}
 		});
+		// Paste Excel/Sheets selection (TSV) starting at this cell, growing the
+		// grid if the pasted block overflows the current rows/columns.
+		el.addEventListener("paste", (ev) => {
+			const text = ev.clipboardData?.getData("text/plain") ?? "";
+			// A single-cell value with no tab/newline pastes normally.
+			if (!/[\t\n\r]/.test(text)) return;
+			ev.preventDefault();
+			this.pasteBlock(text, r, ci);
+		});
+	}
+
+	/**
+	 * Paste a TSV/CSV block with `startR`/`startC` as its top-left cell.
+	 * Tabs separate columns, newlines separate rows. Grows the matrix when the
+	 * block extends past the current bounds.
+	 */
+	private pasteBlock(text: string, startR: number, startC: number): void {
+		const rows = text
+			.replace(/\r\n/g, "\n")
+			.replace(/\r/g, "\n")
+			.replace(/\n$/, "") // ignore a single trailing newline
+			.split("\n")
+			.map((line) => line.split("\t"));
+
+		const cols = this.headers.length;
+		for (let dr = 0; dr < rows.length; dr++) {
+			const targetR = startR + dr;
+			// grow rows
+			while (this.matrix.length <= targetR) {
+				this.matrix.push(new Array(cols).fill(""));
+			}
+			for (let dc = 0; dc < rows[dr].length; dc++) {
+				const targetC = startC + dc;
+				// grow columns across every row + headers
+				while (this.headers.length <= targetC) {
+					this.headers.push("");
+					for (const row of this.matrix) row.push("");
+				}
+				// pad this row if it is shorter than the new column count
+				while (this.matrix[targetR].length <= targetC) {
+					this.matrix[targetR].push("");
+				}
+				this.matrix[targetR][targetC] = rows[dr][dc];
+				if (targetR === 0) this.headers[targetC] = rows[dr][dc];
+			}
+		}
+		this.persist();
+		this.render();
+	}
+
+	private colMenu(ev: MouseEvent, ci: number): void {
+		const menu = new Menu();
+		menu.addItem((i) =>
+			i
+				.setTitle("왼쪽에 열 추가")
+				.setIcon("arrow-left")
+				.onClick(() => this.insertCol(ci))
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("오른쪽에 열 추가")
+				.setIcon("arrow-right")
+				.onClick(() => this.insertCol(ci + 1))
+		);
+		menu.addItem((i) =>
+			i
+				.setTitle("열 삭제")
+				.setIcon("trash")
+				.onClick(() => this.deleteCol(ci))
+		);
+		menu.showAtMouseEvent(ev);
+	}
+
+	private insertCol(at: number): void {
+		const idx = Math.max(0, Math.min(at, this.headers.length));
+		this.headers.splice(idx, 0, "");
+		for (const row of this.matrix) {
+			while (row.length < this.headers.length - 1) row.push("");
+			row.splice(idx, 0, "");
+		}
+		this.persist();
+		this.render();
+	}
+
+	private deleteCol(ci: number): void {
+		if (ci < 0 || ci >= this.headers.length) return;
+		if (this.headers.length <= 1) return; // keep at least one column
+		this.headers.splice(ci, 1);
+		for (const row of this.matrix) {
+			if (ci < row.length) row.splice(ci, 1);
+		}
+		this.persist();
+		this.render();
 	}
 
 	private rowMenu(ev: MouseEvent, r: number): void {

@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-csv-img",
 	"name": "CSV Image Table",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"minAppVersion": "1.0.0",
 	"description": "Render CSV as a table inside Obsidian and embed image cells as inline images. Includes an 'assets' preset for the ai-love-island assets.csv schema (multi-image, caption/source/license, linked rows).",
 	"author": "harrymini",

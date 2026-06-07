@@ -18,9 +18,21 @@ modes (top-right):
 
 | icon | mode | what |
 |---|---|---|
-| ▦ table | **Table** (default) | editable grid — click a cell to edit, Enter to commit. Image-path cells show a thumbnail above the editable path. Click a row number for insert/delete. |
+| ▦ table | **Table** (default) | editable spreadsheet grid — click a cell to edit, Enter commits and moves down. Image-path cells show a thumbnail above the editable path. |
 | ▣ images | **Gallery** | read-only assets card view (shown only when the header matches the assets schema) |
 | ‹› code | **Source** | raw `<textarea>` for bulk edits |
+
+Spreadsheet conveniences in table mode:
+
+- **Add/remove rows** — click a row number (0, 1, 2 …) for an insert-above /
+  insert-below / delete menu.
+- **Add/remove columns** — click a column letter (A, B, C …) for an
+  insert-left / insert-right / delete menu.
+- **Paste from Excel/Sheets** — copy a cell range and paste into a cell; the
+  TSV block fills outward from that cell, growing rows and columns as needed
+  (Confluence/Excel-style).
+- **Click a thumbnail** to open the image full-size in a lightbox (Esc/click to
+  close).
 
 Edits are saved back to the file (round-trip verified against the
 ai-love-island CSVs, including quoted fields and `;`-multi-image cells).
