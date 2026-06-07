@@ -251,6 +251,22 @@
 	outline: none !important;
 }
 
+/* range selection (Excel-style drag) */
+.csv-img-selected {
+	background: var(--text-selection) !important;
+}
+
+/* during a multi-cell drag, let the pointer pass through inputs to the td
+   (so mousemove tracks cells) and don't select text inside them */
+.csv-img-selecting .csv-img-cellinput {
+	pointer-events: none;
+	user-select: none;
+}
+
+.csv-img-selecting {
+	user-select: none;
+}
+
 /* column coordinate row (A, B, C ...) and row-number column share one style.
    Text is centred both horizontally and vertically, with a 2px pad.
    The selector is scoped under .csv-img-editable so it beats the td rule's

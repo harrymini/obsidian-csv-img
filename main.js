@@ -427,6 +427,10 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
     this.headers = [];
     this.textarea = null;
     this.modeActions = [];
+    // Range selection (Excel-style drag). null when nothing is selected.
+    this.selAnchor = null;
+    this.selFocus = null;
+    this.dragging = false;
     this.getSettings = getSettings;
   }
   getViewType() {
@@ -578,6 +582,25 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
     const table = scroll.createEl("table", {
       cls: "csv-img-table csv-img-editable"
     });
+    this.registerDomEvent(table, "mousemove", (ev) => {
+      if (!this.dragging)
+        return;
+      const cell = this.cellFromEvent(ev);
+      if (cell) {
+        this.selFocus = cell;
+        this.paintSelection();
+      }
+    });
+    this.registerDomEvent(document, "mouseup", () => {
+      this.dragging = false;
+    });
+    this.registerDomEvent(table, "keydown", (ev) => {
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "c") {
+        if (this.selAnchor && this.selFocus) {
+          this.copySelection();
+        }
+      }
+    });
     const thead = table.createEl("thead");
     const htr = thead.createEl("tr");
     htr.createEl("th", { cls: "csv-img-corner" });
@@ -600,9 +623,12 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
       handle.addEventListener("click", (ev) => this.rowMenu(ev, r));
       for (let ci = 0; ci < cols; ci++) {
         const td = tr.createEl("td");
+        td.dataset.r = String(r);
+        td.dataset.c = String(ci);
         const value = (_a = this.matrix[r][ci]) != null ? _a : "";
         const isImg = r > 0 && imageColIdx.has(ci) && cellHasImage(value);
         td.addClass(isImg ? "csv-img-imgcell" : "csv-img-textcell");
+        this.bindCellSelection(td, r, ci);
         if (isImg) {
           const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
           for (const p of splitImages(value)) {
@@ -679,6 +705,73 @@ var CsvImgView = class extends import_obsidian2.TextFileView {
       ev.preventDefault();
       this.pasteBlock(text, r, ci);
     });
+  }
+  // ---- range selection (Excel-style drag) ------------------------------
+  /** mousedown on a cell starts a selection anchored there. */
+  bindCellSelection(td, r, ci) {
+    td.addEventListener("mousedown", (ev) => {
+      this.selAnchor = { r, c: ci };
+      this.selFocus = { r, c: ci };
+      this.dragging = true;
+      this.paintSelection();
+    });
+  }
+  /** Resolve the cell coordinate under a mouse event, if any. */
+  cellFromEvent(ev) {
+    let el = ev.target;
+    while (el && !(el.tagName === "TD" && el.dataset.r !== void 0)) {
+      el = el.parentElement;
+    }
+    if (!el)
+      return null;
+    const r = Number(el.dataset.r);
+    const c = Number(el.dataset.c);
+    if (Number.isNaN(r) || Number.isNaN(c))
+      return null;
+    return { r, c };
+  }
+  /** Current selection rectangle (inclusive), normalized, or null. */
+  selectionRect() {
+    if (!this.selAnchor || !this.selFocus)
+      return null;
+    return {
+      r0: Math.min(this.selAnchor.r, this.selFocus.r),
+      c0: Math.min(this.selAnchor.c, this.selFocus.c),
+      r1: Math.max(this.selAnchor.r, this.selFocus.r),
+      c1: Math.max(this.selAnchor.c, this.selFocus.c)
+    };
+  }
+  /** Toggle the .csv-img-selected class on cells inside the rectangle. */
+  paintSelection() {
+    var _a;
+    const rect = this.selectionRect();
+    const tds = this.contentEl.querySelectorAll(
+      "tbody td[data-r]"
+    );
+    const multi = !!rect && (rect.r0 !== rect.r1 || rect.c0 !== rect.c1);
+    (_a = this.contentEl.querySelector("table.csv-img-editable")) == null ? void 0 : _a.toggleClass("csv-img-selecting", multi);
+    tds.forEach((td) => {
+      const r = Number(td.dataset.r);
+      const c = Number(td.dataset.c);
+      const inside = !!rect && r >= rect.r0 && r <= rect.r1 && c >= rect.c0 && c <= rect.c1;
+      td.toggleClass("csv-img-selected", inside);
+    });
+  }
+  /** Copy the selected rectangle to the clipboard as TSV. */
+  copySelection() {
+    var _a, _b;
+    const rect = this.selectionRect();
+    if (!rect)
+      return;
+    const lines = [];
+    for (let r = rect.r0; r <= rect.r1; r++) {
+      const cells = [];
+      for (let c = rect.c0; c <= rect.c1; c++) {
+        cells.push((_b = (_a = this.matrix[r]) == null ? void 0 : _a[c]) != null ? _b : "");
+      }
+      lines.push(cells.join("	"));
+    }
+    navigator.clipboard.writeText(lines.join("\n"));
   }
   /**
    * Paste a TSV/CSV block with `startR`/`startC` as its top-left cell.

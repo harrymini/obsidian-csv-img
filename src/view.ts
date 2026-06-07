@@ -39,6 +39,11 @@ export class CsvImgView extends TextFileView {
 	private textarea: HTMLTextAreaElement | null = null;
 	private modeActions: HTMLElement[] = [];
 
+	// Range selection (Excel-style drag). null when nothing is selected.
+	private selAnchor: { r: number; c: number } | null = null;
+	private selFocus: { r: number; c: number } | null = null;
+	private dragging = false;
+
 	constructor(leaf: WorkspaceLeaf, getSettings: () => CsvImgSettings) {
 		super(leaf);
 		this.getSettings = getSettings;
@@ -218,6 +223,28 @@ export class CsvImgView extends TextFileView {
 			cls: "csv-img-table csv-img-editable",
 		});
 
+		// While dragging, extend the selection as the pointer moves over cells,
+		// and finish on mouseup anywhere.
+		this.registerDomEvent(table, "mousemove", (ev) => {
+			if (!this.dragging) return;
+			const cell = this.cellFromEvent(ev);
+			if (cell) {
+				this.selFocus = cell;
+				this.paintSelection();
+			}
+		});
+		this.registerDomEvent(document, "mouseup", () => {
+			this.dragging = false;
+		});
+		// Cmd/Ctrl+C copies the current selection as TSV.
+		this.registerDomEvent(table, "keydown", (ev) => {
+			if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "c") {
+				if (this.selAnchor && this.selFocus) {
+					this.copySelection();
+				}
+			}
+		});
+
 		// column coordinate row: (corner) A B C ...
 		const thead = table.createEl("thead");
 		const htr = thead.createEl("tr");
@@ -242,6 +269,8 @@ export class CsvImgView extends TextFileView {
 
 			for (let ci = 0; ci < cols; ci++) {
 				const td = tr.createEl("td");
+				td.dataset.r = String(r);
+				td.dataset.c = String(ci);
 				const value = this.matrix[r][ci] ?? "";
 				// only data rows (not the header row) render image thumbnails
 				const isImg =
@@ -251,6 +280,7 @@ export class CsvImgView extends TextFileView {
 				// anywhere in the cell focuses it and the focus border frames
 				// the full height). Image cells keep flow layout.
 				td.addClass(isImg ? "csv-img-imgcell" : "csv-img-textcell");
+				this.bindCellSelection(td, r, ci);
 
 				if (isImg) {
 					const imgs = td.createDiv({ cls: "csv-img-cellimgs" });
@@ -335,6 +365,88 @@ export class CsvImgView extends TextFileView {
 			ev.preventDefault();
 			this.pasteBlock(text, r, ci);
 		});
+	}
+
+	// ---- range selection (Excel-style drag) ------------------------------
+
+	/** mousedown on a cell starts a selection anchored there. */
+	private bindCellSelection(td: HTMLElement, r: number, ci: number): void {
+		td.addEventListener("mousedown", (ev) => {
+			// Let a second click into an already-selected single cell edit text.
+			this.selAnchor = { r, c: ci };
+			this.selFocus = { r, c: ci };
+			this.dragging = true;
+			this.paintSelection();
+		});
+	}
+
+	/** Resolve the cell coordinate under a mouse event, if any. */
+	private cellFromEvent(ev: MouseEvent): { r: number; c: number } | null {
+		let el = ev.target as HTMLElement | null;
+		while (el && !(el.tagName === "TD" && el.dataset.r !== undefined)) {
+			el = el.parentElement;
+		}
+		if (!el) return null;
+		const r = Number(el.dataset.r);
+		const c = Number(el.dataset.c);
+		if (Number.isNaN(r) || Number.isNaN(c)) return null;
+		return { r, c };
+	}
+
+	/** Current selection rectangle (inclusive), normalized, or null. */
+	private selectionRect(): {
+		r0: number;
+		c0: number;
+		r1: number;
+		c1: number;
+	} | null {
+		if (!this.selAnchor || !this.selFocus) return null;
+		return {
+			r0: Math.min(this.selAnchor.r, this.selFocus.r),
+			c0: Math.min(this.selAnchor.c, this.selFocus.c),
+			r1: Math.max(this.selAnchor.r, this.selFocus.r),
+			c1: Math.max(this.selAnchor.c, this.selFocus.c),
+		};
+	}
+
+	/** Toggle the .csv-img-selected class on cells inside the rectangle. */
+	private paintSelection(): void {
+		const rect = this.selectionRect();
+		const tds = this.contentEl.querySelectorAll<HTMLElement>(
+			"tbody td[data-r]"
+		);
+		// A multi-cell selection suppresses text selection inside inputs.
+		const multi =
+			!!rect && (rect.r0 !== rect.r1 || rect.c0 !== rect.c1);
+		this.contentEl
+			.querySelector("table.csv-img-editable")
+			?.toggleClass("csv-img-selecting", multi);
+		tds.forEach((td) => {
+			const r = Number(td.dataset.r);
+			const c = Number(td.dataset.c);
+			const inside =
+				!!rect &&
+				r >= rect.r0 &&
+				r <= rect.r1 &&
+				c >= rect.c0 &&
+				c <= rect.c1;
+			td.toggleClass("csv-img-selected", inside);
+		});
+	}
+
+	/** Copy the selected rectangle to the clipboard as TSV. */
+	private copySelection(): void {
+		const rect = this.selectionRect();
+		if (!rect) return;
+		const lines: string[] = [];
+		for (let r = rect.r0; r <= rect.r1; r++) {
+			const cells: string[] = [];
+			for (let c = rect.c0; c <= rect.c1; c++) {
+				cells.push(this.matrix[r]?.[c] ?? "");
+			}
+			lines.push(cells.join("\t"));
+		}
+		navigator.clipboard.writeText(lines.join("\n"));
 	}
 
 	/**

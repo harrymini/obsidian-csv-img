@@ -28,6 +28,9 @@ Spreadsheet conveniences in table mode:
   insert-below / delete menu.
 - **Add/remove columns** — click a column letter (A, B, C …) for an
   insert-left / insert-right / delete menu.
+- **Select a range** — drag across cells to select a rectangle (highlighted);
+  press Cmd/Ctrl+C to copy it as TSV (pastes straight into Excel/Sheets or back
+  into the grid).
 - **Paste from Excel/Sheets** — copy a cell range and paste into a cell; the
   TSV block fills outward from that cell, growing rows and columns as needed
   (Confluence/Excel-style).
